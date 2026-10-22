@@ -16,8 +16,6 @@ jobs:
       CAP_VERIFY_LOCKED: 1
       CAP_VERIFY_REQUIRE_SUPPORTED: 1
       CAP_VERIFY_HOST: github-hosted
-      CAP_VERIFY_REPORT_DIR: ${{ runner.temp }}/verify-report
-      CAP_VERIFY_FLAKY_FILE: ${{ runner.temp }}/verify-report/flaky.txt
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,6 +24,10 @@ jobs:
         with:
           target: ${{ runner.arch == 'ARM64' && 'aarch64-apple-darwin' || 'x86_64-apple-darwin' }}
           tier: full
+      - name: Report location
+        run: |
+          echo "CAP_VERIFY_REPORT_DIR=$RUNNER_TEMP/verify-report" >> "$GITHUB_ENV"
+          echo "CAP_VERIFY_FLAKY_FILE=$RUNNER_TEMP/verify-report/flaky.txt" >> "$GITHUB_ENV"
       - name: Verify encoder regressions
         run: cargo test --locked --profile ci-verify -p cap-enc-ffmpeg --lib sparse
       - name: Verify production crash paths
