@@ -6,10 +6,10 @@ permissions:
   contents: read
 jobs:
   crash:
-    runs-on: macos-15
+    runs-on: macos-15-intel
     timeout-minutes: 60
     env:
-      CARGO_BUILD_JOBS: 2
+      CARGO_BUILD_JOBS: 3
       CARGO_INCREMENTAL: 0
       CAP_VERIFY_CARGO_PROFILE: ci-verify
       CAP_VERIFY_NEXTEST_PROFILE: ci
