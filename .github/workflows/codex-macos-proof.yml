@@ -1,0 +1,40 @@
+name: Focused macOS crash verification
+on:
+  push:
+    branches: [ci/codex-macos-crash-f7a1202]
+permissions:
+  contents: read
+jobs:
+  crash:
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      CARGO_BUILD_JOBS: 2
+      CARGO_INCREMENTAL: 0
+      CAP_VERIFY_CARGO_PROFILE: ci-verify
+      CAP_VERIFY_NEXTEST_PROFILE: ci
+      CAP_VERIFY_LOCKED: 1
+      CAP_VERIFY_REQUIRE_SUPPORTED: 1
+      CAP_VERIFY_HOST: github-hosted
+      CAP_VERIFY_REPORT_DIR: ${{ runner.temp }}/verify-report
+      CAP_VERIFY_FLAKY_FILE: ${{ runner.temp }}/verify-report/flaky.txt
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/engine-verify-setup
+        with:
+          target: ${{ runner.arch == 'ARM64' && 'aarch64-apple-darwin' || 'x86_64-apple-darwin' }}
+          tier: full
+      - name: Verify encoder regressions
+        run: cargo test --locked --profile ci-verify -p cap-enc-ffmpeg --lib sparse
+      - name: Verify production crash paths
+        run: scripts/verify/run.sh full --suites crash
+      - name: Upload proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-crash-proof-f7a1202
+          path: ${{ runner.temp }}/verify-report
+          retention-days: 1
+          if-no-files-found: ignore
