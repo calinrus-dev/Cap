@@ -21,6 +21,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/engine-verify-setup
+        id: setup
         with:
           target: ${{ runner.arch == 'ARM64' && 'aarch64-apple-darwin' || 'x86_64-apple-darwin' }}
           tier: full
@@ -32,11 +33,27 @@ jobs:
         run: |
           cargo build --locked --profile ci-verify -p cap-muxer
           mkdir -p target/debug
-          ln -s ../ci-verify/cap-muxer target/debug/cap-muxer
+          ln -sf ../ci-verify/cap-muxer target/debug/cap-muxer
+          ln -sfn ../Frameworks target/ci-verify/Frameworks
+          test -f target/ci-verify/Frameworks/Spacedrive.framework/Libraries/libavcodec.61.19.100.dylib
       - name: Verify sparse writer without extra keyframes
         run: cargo test --locked --profile ci-verify -p cap-recording --test oop_muxer sparse_subprocess
       - name: Verify production crash paths
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: scripts/verify/run.sh full --suites crash
+      - name: Record cached sources
+        if: ${{ always() && steps.setup.outcome == 'success' && steps.setup.outputs.build-cache-hit != 'true' }}
+        run: python3 scripts/verify/mtime.py record target/ci-verify/verify-src-manifest.txt
+      - name: Save build cache
+        if: ${{ always() && steps.setup.outcome == 'success' && steps.setup.outputs.build-cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/ci-verify/
+          key: ${{ steps.setup.outputs.build-cache-key }}
       - name: Upload proof
         if: always()
         uses: actions/upload-artifact@v4
