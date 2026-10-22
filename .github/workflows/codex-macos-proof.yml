@@ -1,0 +1,47 @@
+name: Focused macOS crash verification
+on:
+  push:
+    branches: [ci/codex-macos-crash-3e5cd73]
+permissions:
+  contents: read
+jobs:
+  crash:
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      CARGO_BUILD_JOBS: 2
+      CARGO_INCREMENTAL: 0
+      CAP_VERIFY_CARGO_PROFILE: ci-verify
+      CAP_VERIFY_NEXTEST_PROFILE: ci
+      CAP_VERIFY_LOCKED: 1
+      CAP_VERIFY_REQUIRE_SUPPORTED: 1
+      CAP_VERIFY_HOST: github-hosted
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/engine-verify-setup
+        with:
+          target: ${{ runner.arch == 'ARM64' && 'aarch64-apple-darwin' || 'x86_64-apple-darwin' }}
+          tier: full
+      - name: Report location
+        run: |
+          echo "CAP_VERIFY_REPORT_DIR=$RUNNER_TEMP/verify-report" >> "$GITHUB_ENV"
+          echo "CAP_VERIFY_FLAKY_FILE=$RUNNER_TEMP/verify-report/flaky.txt" >> "$GITHUB_ENV"
+      - name: Build subprocess
+        run: |
+          cargo build --locked --profile ci-verify -p cap-muxer
+          mkdir -p target/debug
+          ln -s ../ci-verify/cap-muxer target/debug/cap-muxer
+      - name: Verify sparse writer without extra keyframes
+        run: cargo test --locked --profile ci-verify -p cap-recording --test oop_muxer sparse_subprocess
+      - name: Verify production crash paths
+        run: scripts/verify/run.sh full --suites crash
+      - name: Upload proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-crash-proof-3e5cd73
+          path: ${{ runner.temp }}/verify-report
+          retention-days: 1
+          if-no-files-found: ignore
